@@ -29,7 +29,7 @@ contract TokenPool is Ownable {
 
   struct YieldInfo {
     uint256 amount;
-    uint256 lastBlock;
+    uint256 timeStamp;
   }
 
   mapping(address => YieldInfo) yieldInfo;
@@ -52,7 +52,7 @@ contract TokenPool is Ownable {
     if ( yieldInfo[msg.sender].amount > 0 ) revert RequireToUnstake();
 
     yieldInfo[msg.sender].amount += amount_;
-    yieldInfo[msg.sender].lastBlock = block.timestamp;
+    yieldInfo[msg.sender].timeStamp = block.timestamp;
 
     SafeBEP20.safeApprove(IBEP20(PAIR), address(this), amount_);
     SafeBEP20.safeTransferFrom(IBEP20(PAIR), msg.sender, address(this), amount_);
@@ -65,7 +65,7 @@ contract TokenPool is Ownable {
     uint256 reward = calculateReward();
 
     yieldInfo[msg.sender].amount = 0;
-    yieldInfo[msg.sender].lastBlock = 0;
+    yieldInfo[msg.sender].timeStamp = 0;
 
     rToken.mint(reward);
     rToken.transfer(msg.sender, reward);
@@ -77,7 +77,7 @@ contract TokenPool is Ownable {
   function farm() external {
     uint256 reward = calculateReward();
 
-    yieldInfo[msg.sender].lastBlock = block.timestamp;
+    yieldInfo[msg.sender].timeStamp = block.timestamp;
 
     rToken.mint(reward);
     SafeBEP20.safeApprove(IBEP20(rToken), msg.sender, reward);
@@ -87,9 +87,9 @@ contract TokenPool is Ownable {
   function calculateReward() internal view returns (uint256) {
     YieldInfo memory info = yieldInfo[msg.sender];
     if ( info.amount < 0 ) revert RequireToStake();
-    if (((block.timestamp - info.lastBlock) / 1 days) < 1) revert RequireDayTimelength();
+    if (((block.timestamp - info.timeStamp) / 1 days) < 1) revert RequireDayTimelength();
 
-    return ((block.timestamp - info.lastBlock) / 1 days) * (info.amount * ((stakingAPY / 100) / 365)) ;
+    return ((block.timestamp - info.timeStamp) / 1 days) * (info.amount * ((stakingAPY / 100) / 365)) ;
   }
 
   function setAPY(uint256 stakingAPY_) external onlyOwner {
