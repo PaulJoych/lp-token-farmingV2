@@ -52,7 +52,7 @@ contract TokenPool is Ownable {
     if ( yieldInfo[msg.sender].amount > 0 ) revert RequireToUnstake();
 
     yieldInfo[msg.sender].amount += amount_;
-    yieldInfo[msg.sender].lastBlock += block.timestamp;
+    yieldInfo[msg.sender].lastBlock = block.timestamp;
 
     SafeBEP20.safeApprove(IBEP20(PAIR), address(this), amount_);
     SafeBEP20.safeTransferFrom(IBEP20(PAIR), msg.sender, address(this), amount_);
