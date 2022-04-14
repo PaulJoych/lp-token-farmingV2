@@ -89,7 +89,7 @@ contract TokenPool is Ownable {
     if ( info.amount < 0 ) revert RequireToStake();
     if (((block.timestamp - info.lastBlock) / 1 days) < 1) revert RequireDayTimelength();
 
-    return ((block.timestamp - info.lastBlock) / 1 days) * (info.amount * (stakingAPY / 100)) ;
+    return ((block.timestamp - info.lastBlock) / 1 days) * (info.amount * ((stakingAPY / 100) / 365)) ;
   }
 
   function setAPY(uint256 stakingAPY_) external onlyOwner {
