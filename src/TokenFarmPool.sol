@@ -6,25 +6,22 @@ import "./lib/IBEP20.sol";
 import "./lib/SafeBEP20.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@pancakeswap/core/contracts/interfaces/IPancakeFactory.sol";
+import "@pancakeswap/periphery/contracts/interfaces/IPancakeRouter02.sol";
 
-import { Token } from "./Token.sol";
-import { RewardToken } from "./RewardToken.sol";
-
-import { IPancakeFactory } from "@pancakeswap/core/contracts/interfaces/IPancakeFactory.sol";
-import { IPancakePair } from  "@pancakeswap/core/contracts/interfaces/IPancakePair.sol";
-
-contract TokenPool is Ownable {
+contract TokenFarmPool is Ownable {
   error RequireDayTimelength();
   error RequireToUnstake();
   error RequireToStake();
 
-  address public immutable WETH;
+  IPancakeFactory v2Factory;
+  IPancakeRouter02 v2Router;
 
-  address public immutable FACTORY;
-  address public immutable PAIR;
 
-  Token mToken;
-  RewardToken rToken;
+  address v2Pair;
+  address public immutable mToken;
+  address public immutable rToken;
+
   uint256 public stakingAPY;
 
   struct YieldInfo {
@@ -35,17 +32,18 @@ contract TokenPool is Ownable {
   mapping(address => YieldInfo) yieldInfo;
 
   constructor(
-    address _factory,
-    address _WETH
+    address _v2Router,
+    address _mToken,
+    address _rToken
   ) {
-    FACTORY = _factory;
-    WETH = _WETH;
+    mToken = _mToken;
+    rToken = _rToken;
+
+    v2Router = IPancakeRouter02(_v2Router);
+    v2Factory = IPancakeFactory(v2Router.factory());
+    v2Pair = v2Factory.createPair(mToken, v2Router.WETH());
 
     stakingAPY = 10;
-
-    IPancakeFactory(FACTORY).createPair(address(rToken), WETH);
-    IPancakeFactory(FACTORY).createPair(address(mToken), WETH);
-    PAIR = IPancakeFactory(FACTORY).getPair(address(mToken), WETH);
   }
 
   function stakeLpToken(uint256 amount_) external {
@@ -54,8 +52,8 @@ contract TokenPool is Ownable {
     yieldInfo[msg.sender].amount += amount_;
     yieldInfo[msg.sender].timeStamp = block.timestamp;
 
-    SafeBEP20.safeApprove(IBEP20(PAIR), address(this), amount_);
-    SafeBEP20.safeTransferFrom(IBEP20(PAIR), msg.sender, address(this), amount_);
+    SafeBEP20.safeApprove(IBEP20(v2Pair), address(this), amount_);
+    SafeBEP20.safeTransferFrom(IBEP20(v2Pair), msg.sender, address(this), amount_);
   }
 
   function unStakeLpToken() external {
@@ -67,11 +65,12 @@ contract TokenPool is Ownable {
     yieldInfo[msg.sender].amount = 0;
     yieldInfo[msg.sender].timeStamp = 0;
 
-    rToken.mint(reward);
-    rToken.transfer(msg.sender, reward);
+    BEP20(rToken).mint(reward);
+    SafeBEP20.safeApprove(IBEP20(rToken), msg.sender, reward);
+    SafeBEP20.safeTransferFrom(IBEP20(rToken), address(this), msg.sender, reward);
 
-    SafeBEP20.safeApprove(IBEP20(PAIR), msg.sender, amount);
-    SafeBEP20.safeTransferFrom(IBEP20(PAIR), address(this), msg.sender, amount);
+    SafeBEP20.safeApprove(IBEP20(v2Pair), msg.sender, amount);
+    SafeBEP20.safeTransferFrom(IBEP20(v2Pair), address(this), msg.sender, amount);
   }
 
   function farm() external {
@@ -79,7 +78,7 @@ contract TokenPool is Ownable {
 
     yieldInfo[msg.sender].timeStamp = block.timestamp;
 
-    rToken.mint(reward);
+    BEP20(rToken).mint(reward);
     SafeBEP20.safeApprove(IBEP20(rToken), msg.sender, reward);
     SafeBEP20.safeTransferFrom(IBEP20(rToken), address(this), msg.sender, reward);
   }
