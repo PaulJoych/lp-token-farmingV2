@@ -10,13 +10,12 @@ import "@pancakeswap/core/contracts/interfaces/IPancakeFactory.sol";
 import "@pancakeswap/periphery/contracts/interfaces/IPancakeRouter02.sol";
 
 contract TokenFarmPool is Ownable {
-  error RequireDayTimelength();
+  error RequireOneDayLength();
   error RequireToUnstake();
   error RequireToStake();
 
   IPancakeFactory v2Factory;
   IPancakeRouter02 v2Router;
-
 
   address v2Pair;
   address public immutable mToken;
@@ -57,10 +56,11 @@ contract TokenFarmPool is Ownable {
   }
 
   function unStakeLpToken() external {
-    uint256 amount = yieldInfo[msg.sender].amount;
-    if ( amount <= 0 ) revert RequireToStake();
+    YieldInfo memory info = yieldInfo[msg.sender];
+    if ( info.amount < 0 ) revert RequireToStake();
+    if (((block.timestamp - info.timeStamp) / 1 days) < 1) revert RequireOneDayLength();
 
-    uint256 reward = calculateReward();
+    uint256 reward = calculateReward(info.timeStamp, info.amount);
 
     yieldInfo[msg.sender].amount = 0;
     yieldInfo[msg.sender].timeStamp = 0;
@@ -69,12 +69,16 @@ contract TokenFarmPool is Ownable {
     SafeBEP20.safeApprove(IBEP20(rToken), msg.sender, reward);
     SafeBEP20.safeTransferFrom(IBEP20(rToken), address(this), msg.sender, reward);
 
-    SafeBEP20.safeApprove(IBEP20(v2Pair), msg.sender, amount);
-    SafeBEP20.safeTransferFrom(IBEP20(v2Pair), address(this), msg.sender, amount);
+    SafeBEP20.safeApprove(IBEP20(v2Pair), msg.sender, info.amount);
+    SafeBEP20.safeTransferFrom(IBEP20(v2Pair), address(this), msg.sender, info.amount);
   }
 
   function farm() external {
-    uint256 reward = calculateReward();
+    YieldInfo memory info = yieldInfo[msg.sender];
+    if ( info.amount < 0 ) revert RequireToStake();
+    if (((block.timestamp - info.timeStamp) / 1 days) < 1) revert RequireOneDayLength();
+
+    uint256 reward = calculateReward(info.timeStamp, info.amount);
 
     yieldInfo[msg.sender].timeStamp = block.timestamp;
 
@@ -83,12 +87,8 @@ contract TokenFarmPool is Ownable {
     SafeBEP20.safeTransferFrom(IBEP20(rToken), address(this), msg.sender, reward);
   }
 
-  function calculateReward() internal view returns (uint256) {
-    YieldInfo memory info = yieldInfo[msg.sender];
-    if ( info.amount < 0 ) revert RequireToStake();
-    if (((block.timestamp - info.timeStamp) / 1 days) < 1) revert RequireDayTimelength();
-
-    return ((block.timestamp - info.timeStamp) / 1 days) * (info.amount * ((stakingAPY / 100) / 365)) ;
+  function calculateReward(uint256 timeStamp_, uint256 amount_) internal view returns (uint256) {
+    return ((block.timestamp - timeStamp_) / 1 days) * (amount_ * ((stakingAPY / 100) / 365)) ;
   }
 
   function setAPY(uint256 stakingAPY_) external onlyOwner {
