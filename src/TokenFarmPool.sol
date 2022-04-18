@@ -58,7 +58,7 @@ contract TokenFarmPool is Ownable {
   function unStakeLpToken() external {
     YieldInfo memory info = yieldInfo[msg.sender];
     if ( info.amount < 0 ) revert RequireToStake();
-    if (((block.timestamp - info.timeStamp) / 1 days) < 1) revert RequireOneDayLength();
+    if (!calculateTime(info.timeStamp)) revert RequireOneDayLength();
 
     uint256 reward = calculateReward(info.timeStamp, info.amount);
 
@@ -76,7 +76,7 @@ contract TokenFarmPool is Ownable {
   function farm() external {
     YieldInfo memory info = yieldInfo[msg.sender];
     if ( info.amount < 0 ) revert RequireToStake();
-    if (((block.timestamp - info.timeStamp) / 1 days) < 1) revert RequireOneDayLength();
+    if (!calculateTime(info.timeStamp)) revert RequireOneDayLength();
 
     uint256 reward = calculateReward(info.timeStamp, info.amount);
 
@@ -89,6 +89,10 @@ contract TokenFarmPool is Ownable {
 
   function calculateReward(uint256 timeStamp_, uint256 amount_) internal view returns (uint256) {
     return ((block.timestamp - timeStamp_) / 1 days) * (amount_ * ((stakingAPY / 100) / 365)) ;
+  }
+
+  function calculateTime(uint256 timestamp_) internal view returns (bool) {
+    return(((block.timestamp - timestamp_) / 1 days) > 1);
   }
 
   function setAPY(uint256 stakingAPY_) external onlyOwner {
